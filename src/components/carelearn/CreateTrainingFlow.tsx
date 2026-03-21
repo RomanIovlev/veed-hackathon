@@ -5,6 +5,17 @@ import { toast } from "@/hooks/use-toast";
 import { Training, StaffMember, LANGUAGES, QuizQuestion, UserGroup, USER_GROUPS } from "@/data/carelearn-data";
 import { TRAINING_CATEGORIES, getCategoryById } from "@/config/trainingCategories";
 
+// Helper function to get the correct API URL for different environments
+const getVideoGenerationUrl = () => {
+  // Check if we're in production (deployed on Netlify)
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return '/api/generate-video'; // Use Netlify Functions in production
+  }
+  
+  // Use local development server
+  return 'http://localhost:3002/generate-video'; // Updated to match backend server
+};
+
 interface TopicContentBlock {
   type: "text" | "image" | "video" | "quiz";
   value: string;
@@ -575,7 +586,7 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
         resolution: requestBody.resolution
       });
 
-      const response = await fetch('http://localhost:3004/generate-video', {
+      const response = await fetch(getVideoGenerationUrl(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

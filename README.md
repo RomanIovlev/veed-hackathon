@@ -79,6 +79,26 @@ Access the database admin interface at:
 | `bun test` | Run tests |
 | `bun lint` | Run ESLint |
 
+## Deployment to Netlify
+
+This project is configured for seamless deployment to Netlify. After initial setup, you only need to push to your repository to deploy updates.
+
+### Quick Deploy
+
+1. **Set up cloud database** (Neon, Supabase, or Railway)
+2. **Push to GitHub** and connect to Netlify
+3. **Set environment variables** in Netlify dashboard
+4. **Deploy automatically** on every push
+
+See [DEPLOY.md](./DEPLOY.md) for detailed deployment instructions.
+
+### Required Environment Variables
+
+- `FAL_KEY`: Your FAL AI API key for TTS/video generation
+- `DATABASE_URL`: PostgreSQL connection string for your cloud database
+- `VEED_API_KEY`: Optional VEED API key for advanced video features
+- `NODE_ENV`: Set to `production`
+
 ## Mobile App
 
 This project does not currently include a mobile application. The web app is responsive and can be accessed on mobile devices through a web browser.

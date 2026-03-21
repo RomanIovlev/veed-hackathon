@@ -1,7 +1,18 @@
 // Local Database Client - PostgreSQL Database Integration
 // This client provides database operations for our local PostgreSQL database
 
-const API_BASE_URL = 'http://localhost:3002/api';
+// Detect environment and set appropriate API base URL
+const getApiBaseUrl = () => {
+  // Check if we're in production (deployed on Netlify)
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return '/api'; // Use Netlify Functions in production
+  }
+  
+  // Use local development server
+  return 'http://localhost:3002/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Generic API response type
 interface ApiResponse<T = any> {
