@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: training_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: training_db
+      POSTGRES_USER: training_user
+      POSTGRES_PASSWORD: training_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - training_network
+
+  adminer:
+    image: adminer:latest
+    container_name: training_adminer
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    networks:
+      - training_network
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  training_network:
+    driver: bridge
