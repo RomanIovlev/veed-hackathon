@@ -19,12 +19,14 @@ function NavItem({ active, icon, label, onClick }: { active: boolean; icon: Reac
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
         active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-secondary"
       }`}
     >
-      {icon}
-      {label}
+      <div className="w-5 h-5 flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <span className="flex-1">{label}</span>
     </button>
   );
 }

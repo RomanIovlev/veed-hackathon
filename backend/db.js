@@ -385,30 +385,38 @@ export const db = {
     return this.assignTrainingToGroups(trainingId, groupIds);
   },
 
-  // Get all trainings with their assignment statistics  
+  // Get all trainings with their assignment statistics based on user groups
   async getTrainingsWithStats() {
     try {
       // First get all trainings
       const trainingsQuery = 'SELECT * FROM training_documents ORDER BY created_at DESC';
       const trainingsResult = await this.query(trainingsQuery);
       
-      // Then get assignment stats for each training
+      // Then get assignment stats for each training based on group membership
       const trainingsWithStats = [];
       for (const training of trainingsResult.rows) {
-        const statsQuery = `
-          SELECT 
-            COUNT(DISTINCT user_id) as assigned,
-            COUNT(DISTINCT CASE WHEN status = 'completed' THEN user_id END) as completed
-          FROM user_training_assignments 
-          WHERE training_id = $1
+        // Count users whose groups overlap with training's assigned groups
+        const assignedCountQuery = `
+          SELECT COUNT(DISTINCT id) as assigned
+          FROM users 
+          WHERE user_groups && $1
         `;
-        const statsResult = await this.query(statsQuery, [training.id]);
-        const stats = statsResult.rows[0];
+        const assignedResult = await this.query(assignedCountQuery, [training.assigned_to_groups]);
+        const assignedCount = parseInt(assignedResult.rows[0].assigned) || 0;
+        
+        // Count completed from actual assignments table
+        const completedQuery = `
+          SELECT COUNT(DISTINCT user_id) as completed
+          FROM user_training_assignments 
+          WHERE training_id = $1 AND status = 'completed'
+        `;
+        const completedResult = await this.query(completedQuery, [training.id]);
+        const completedCount = parseInt(completedResult.rows[0].completed) || 0;
         
         trainingsWithStats.push({
           ...training,
-          assigned: parseInt(stats.assigned) || 0,
-          completed: parseInt(stats.completed) || 0
+          assigned: assignedCount,
+          completed: completedCount
         });
       }
       

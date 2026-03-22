@@ -18,7 +18,7 @@ export interface StaffMember {
 }
 
 export interface Training {
-  id: number;
+  id: string;
   title: string;
   description: string;
   categories: string[];
@@ -30,6 +30,7 @@ export interface Training {
   duration: number;
   questions: QuizQuestion[];
   notes: string;
+  assignedToGroups: string[];
 }
 
 export interface QuizQuestion {

@@ -5,18 +5,15 @@ import { StatusBadge } from "./StatusBadge";
 import { Training, StaffMember, LANGUAGES } from "@/data/carelearn-data";
 import { localDb as db } from "@/integrations/local/client";
 import { toast } from "@/hooks/use-toast";
-import { TRAINING_CATEGORIES, getCategoryById, UNCATEGORISED } from "@/config/trainingCategories";
-import type { TrainingCategory } from "@/config/trainingCategories";
+// User groups for filtering trainings by assignment
+const USER_GROUPS = [
+  { id: 'carer', label: 'Carer', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { id: 'senior-carer', label: 'Senior Carer', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { id: 'nurse', label: 'Nurse', color: 'bg-green-100 text-green-800 border-green-200' },
+  { id: 'manager', label: 'Manager', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { id: 'all-staff', label: 'All Staff', color: 'bg-gray-100 text-gray-800 border-gray-200' },
+];
 
-function CategoryBadge({ category }: { category: TrainingCategory }) {
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${category.colour.bg} ${category.colour.text} ${category.colour.border}`}
-    >
-      {category.label}
-    </span>
-  );
-}
 
 interface DashboardContentProps {
   trainings: Training[];
@@ -27,6 +24,8 @@ interface DashboardContentProps {
 }
 
 export function DashboardContent({ trainings, staff, loading, onEdit, onRefresh }: DashboardContentProps) {
+  console.log('🎯 DashboardContent received trainings:', trainings.map(t => ({ title: t.title, assigned: t.assigned, completed: t.completed })));
+  
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>("all");
@@ -37,10 +36,16 @@ export function DashboardContent({ trainings, staff, loading, onEdit, onRefresh 
   });
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // Filter trainings based on selected category
+  // Filter trainings based on selected user group
   const filteredTrainings = activeFilter === "all" 
     ? trainings 
-    : trainings.filter((t) => t.categories.includes(activeFilter));
+    : trainings.filter((t) => t.assignedToGroups.includes(activeFilter));
+  
+  console.log(`🔍 Active filter: ${activeFilter}, Filtered trainings:`, filteredTrainings.map(t => ({ 
+    title: t.title, 
+    assigned: t.assigned, 
+    assignedToGroups: t.assignedToGroups 
+  })));
 
   const fetchAssignmentStats = async () => {
     try {
@@ -129,17 +134,17 @@ export function DashboardContent({ trainings, staff, loading, onEdit, onRefresh 
         >
           All
         </button>
-        {TRAINING_CATEGORIES.map((cat) => (
+        {USER_GROUPS.map((group) => (
           <button
-            key={cat.id}
-            onClick={() => setActiveFilter(cat.id)}
+            key={group.id}
+            onClick={() => setActiveFilter(group.id)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all border ${
-              activeFilter === cat.id
-                ? `${cat.colour.bg} ${cat.colour.text} ${cat.colour.border} shadow-sm`
+              activeFilter === group.id
+                ? `${group.color} shadow-sm`
                 : "bg-secondary text-muted-foreground border-transparent hover:bg-accent"
             }`}
           >
-            {cat.label}
+            {group.label}
           </button>
         ))}
       </div>
@@ -173,7 +178,10 @@ export function DashboardContent({ trainings, staff, loading, onEdit, onRefresh 
                     })}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center tabular-nums">{t.assigned}</td>
+                <td className="px-6 py-4 text-center tabular-nums">
+                  {console.log(`🎯 Rendering ${t.title} assigned:`, t.assigned, typeof t.assigned)}
+                  {t.assigned}
+                </td>
                 <td className="px-6 py-4 text-center tabular-nums">{t.completed}</td>
                 <td className="px-6 py-4 text-muted-foreground text-sm">{t.due}</td>
                 <td className="px-6 py-4">
@@ -208,7 +216,7 @@ export function DashboardContent({ trainings, staff, loading, onEdit, onRefresh 
       {/* Empty state for filtered results */}
       {filteredTrainings.length === 0 && activeFilter !== "all" && trainings.length > 0 && (
         <div className="text-center py-16 bg-card border border-border rounded-2xl mt-6">
-          <p className="text-muted-foreground font-medium">No trainings in this category</p>
+          <p className="text-muted-foreground font-medium">No trainings assigned to this group</p>
         </div>
       )}
 

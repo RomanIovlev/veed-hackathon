@@ -19,26 +19,44 @@ const Index = () => {
     setLoading(true);
     try {
       // Try new API endpoint with assignment statistics first
+      console.log('🚀 Making API request to /api/trainings/with-stats');
       const response = await fetch('http://localhost:3002/api/trainings/with-stats');
       const result = await response.json();
+      console.log('🔍 Raw API response:', result);
       
       if (result.success && result.data) {
-        const mappedTrainings: Training[] = result.data.map((doc: any) => ({
-          id: doc.id,
-          title: doc.title,
-          description: doc.description || "",
-          categories: doc.categories || [],
-          langs: doc.languages || ["en"],
-          assigned: doc.assigned || 0, // Real assignment count from database
-          completed: doc.completed || 0, // Real completion count from database
-          status: doc.status || "Active",
-          due: doc.due_date || new Date().toISOString().split("T")[0],
-          duration: doc.duration || 10,
-          notes: doc.notes || "",
-          questions: doc.questions || [],
-        }));
+        console.log('✅ API returned success with data:', result.data.length, 'trainings');
+        const mappedTrainings: Training[] = result.data.map((doc: any) => {
+          console.log(`🔍 Mapping training ${doc.title}:`, {
+            raw_assigned: doc.assigned,
+            raw_completed: doc.completed,
+            parsed_assigned: parseInt(doc.assigned),
+            parsed_completed: parseInt(doc.completed),
+          });
+          return {
+            id: doc.id,
+            title: doc.title,
+            description: doc.description || "",
+            categories: doc.categories || [],
+            langs: doc.languages || ["en"],
+            assigned: parseInt(doc.assigned) || 0, // Real assignment count from database
+            completed: parseInt(doc.completed) || 0, // Real completion count from database
+            status: doc.status || "Active",
+            due: doc.due_date || new Date().toISOString().split("T")[0],
+            duration: doc.duration || 10,
+            notes: doc.notes || "",
+            questions: doc.questions || [],
+            assignedToGroups: doc.assigned_to_groups || [],
+          };
+        });
+        console.log('🎯 Final mapped trainings before setState:', mappedTrainings);
         setTrainings(mappedTrainings);
         console.log(`📊 Loaded ${mappedTrainings.length} trainings with real assignment data`);
+        mappedTrainings.forEach(training => {
+          console.log(`🏷️ ${training.title}: assigned=${training.assigned}, completed=${training.completed}, id=${training.id}`);
+        });
+        setLoading(false);
+        return; // Exit here to prevent fallback APIs from overwriting data
       }
     } catch (err) {
       console.error("Error with new API, trying basic endpoint:", err);
@@ -63,9 +81,12 @@ const Index = () => {
           duration: doc.duration || 10,
           notes: doc.notes || "",
           questions: doc.questions || [],
+          assignedToGroups: doc.assigned_to_groups || [],
         }));
         setTrainings(mappedTrainings);
         console.log(`📊 Loaded ${mappedTrainings.length} trainings (fallback method)`);
+        setLoading(false);
+        return; // Exit here to prevent local client fallback from overwriting data
       }
     } catch (err) {
       console.error("Error with basic API:", err);
@@ -89,6 +110,7 @@ const Index = () => {
           duration: doc.duration || 10,
           notes: doc.notes || "",
           questions: doc.questions || [],
+          assignedToGroups: doc.assigned_to_groups || [],
         }));
         setTrainings(mappedTrainings);
         console.log(`📊 Loaded ${mappedTrainings.length} trainings (local client fallback)`);
