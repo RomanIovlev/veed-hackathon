@@ -5,6 +5,7 @@ import { StatusBadge } from "./StatusBadge";
 import { Training, StaffMember, LANGUAGES } from "@/data/carelearn-data";
 import { localDb as db } from "@/integrations/local/client";
 import { toast } from "@/hooks/use-toast";
+import { formatDueDate } from "@/lib/utils";
 // User groups for filtering trainings by assignment
 const USER_GROUPS = [
   { id: 'carer', label: 'Carer', color: 'bg-blue-100 text-blue-800 border-blue-200' },
@@ -178,12 +179,9 @@ export function DashboardContent({ trainings, staff, loading, onEdit, onRefresh 
                     })}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center tabular-nums">
-                  {console.log(`🎯 Rendering ${t.title} assigned:`, t.assigned, typeof t.assigned)}
-                  {t.assigned}
-                </td>
+                <td className="px-6 py-4 text-center tabular-nums">{t.assigned}</td>
                 <td className="px-6 py-4 text-center tabular-nums">{t.completed}</td>
-                <td className="px-6 py-4 text-muted-foreground text-sm">{t.due}</td>
+                <td className="px-6 py-4 text-muted-foreground text-sm">{formatDueDate(t.due)}</td>
                 <td className="px-6 py-4">
                   <StatusBadge variant={t.status === "Overdue" ? "error" : t.status === "Draft" ? "default" : "active"}>
                     {t.status}

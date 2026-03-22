@@ -1,6 +1,7 @@
 import { X, Mail, Globe, Clock, CheckCircle2, AlertCircle, BookOpen } from "lucide-react";
 import { StaffMember, Training, LANGUAGES } from "@/data/carelearn-data";
 import { StatusBadge } from "./StatusBadge";
+import { formatDueDate } from "@/lib/utils";
 
 interface StaffProfileProps {
   member: StaffMember;
@@ -108,7 +109,7 @@ export function StaffProfile({ member, trainings, onClose }: StaffProfileProps) 
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{t.title}</p>
-                    <p className="text-xs text-muted-foreground">Due: {t.due}</p>
+                    <p className="text-xs text-muted-foreground">Due: {formatDueDate(t.due)}</p>
                   </div>
                   <StatusBadge
                     variant={t.memberStatus === "Completed" ? "success" : t.memberStatus === "Overdue" ? "error" : "default"}

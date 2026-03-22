@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db } from './db.js';
 
 // Load environment variables from .env file
@@ -52,6 +53,272 @@ if (isApiKeyConfigured) {
   console.log('⚠️  WARNING: FAL_KEY not configured properly');
   console.log('   Set your API key with: set FAL_KEY=your_actual_api_key_here');
 }
+
+// Configure Gemini AI
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+let genAI = null;
+
+if (GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key_here' && GEMINI_API_KEY.trim().length > 10) {
+  genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  console.log('✅ Gemini API key configured');
+} else {
+  console.log('⚠️  Gemini API key not configured. AI text generation will fail.');
+  console.log('   Get your API key from: https://aistudio.google.com/app/apikey');
+  console.log('   Set GEMINI_API_KEY environment variable');
+}
+
+// =====================================
+// AI ENDPOINTS (must be before other /api routes)
+// =====================================
+
+// Generate training description
+app.post('/api/generate-description', async (req, res) => {
+  try {
+    if (!genAI) {
+      return res.status(500).json({
+        success: false,
+        error: 'Gemini API not configured',
+        message: 'Please set GEMINI_API_KEY environment variable'
+      });
+    }
+
+    const { title, categories, description } = req.body;
+    
+    if (!title && !description) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameter: provide title or description'
+      });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    const prompt = `Generate a detailed training description for healthcare staff training.
+Title: ${title || 'Healthcare Training'}
+Categories: ${categories || 'General healthcare training'}
+${description ? `User's input: ${description}` : ''}
+
+Write a professional, engaging description that explains:
+- What staff will learn from this training
+- Key learning objectives
+- Why this training is important for healthcare professionals
+- How it will improve patient care
+
+Keep it between 2-4 sentences, 50-500 characters, professional tone, suitable for eldercare/healthcare context.`;
+
+    const result = await model.generateContent(prompt);
+    const suggestion = result.response.text();
+
+    res.json({ 
+      success: true, 
+      suggestion: suggestion.trim()
+    });
+
+  } catch (error) {
+    console.error('Error generating description:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate description',
+      message: error.message
+    });
+  }
+});
+
+// Generate training structure
+app.post('/api/generate-structure', async (req, res) => {
+  try {
+    if (!genAI) {
+      return res.status(500).json({
+        success: false,
+        error: 'Gemini API not configured',
+        message: 'Please set GEMINI_API_KEY environment variable'
+      });
+    }
+
+    const { title, description, categories } = req.body;
+    
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameter: title'
+      });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    const prompt = `Generate a training structure for healthcare training: "${title}"
+Description: ${description || 'Healthcare training'}
+Categories: ${categories || 'General healthcare'}
+
+Create 3-5 main training topics. For each topic, provide:
+- A clear, concise title (4-8 words)
+- Brief description of what will be covered
+
+Respond in JSON format:
+{
+  "topics": [
+    {
+      "title": "Topic Title Here",
+      "description": "Brief description of topic content"
+    }
+  ]
+}
+
+Focus on practical, actionable healthcare knowledge appropriate for eldercare staff.`;
+
+    const result = await model.generateContent(prompt);
+    let response = result.response.text().trim();
+    
+    response = response.replace(/```json\n?/, '').replace(/```\n?$/, '');
+    
+    const structure = JSON.parse(response);
+
+    res.json({ 
+      success: true, 
+      ...structure
+    });
+
+  } catch (error) {
+    console.error('Error generating structure:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate structure',
+      message: error.message
+    });
+  }
+});
+
+// Generate topic content
+app.post('/api/generate-topic-content', async (req, res) => {
+  try {
+    if (!genAI) {
+      return res.status(500).json({
+        success: false,
+        error: 'Gemini API not configured',
+        message: 'Please set GEMINI_API_KEY environment variable'
+      });
+    }
+
+    const { topicTitle, trainingTitle, categories } = req.body;
+    
+    if (!topicTitle) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameter: topicTitle'
+      });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    const prompt = `Generate comprehensive content for healthcare training topic: "${topicTitle}"
+Training: ${trainingTitle || 'Healthcare Training'}
+Categories: ${categories || 'General healthcare'}
+
+Create content for eldercare/healthcare staff including:
+1. Detailed educational text (200-300 words)
+2. Key learning points
+3. Practical examples
+4. A video script concept (what should be demonstrated)
+
+Respond in JSON format:
+{
+  "text": "Detailed educational content here...",
+  "keyPoints": ["Point 1", "Point 2", "Point 3"],
+  "video_brief": "Description of what the video should show/demonstrate"
+}
+
+Focus on practical, actionable knowledge for healthcare professionals.`;
+
+    const result = await model.generateContent(prompt);
+    let response = result.response.text().trim();
+    
+    response = response.replace(/```json\n?/, '').replace(/```\n?$/, '');
+    
+    const content = JSON.parse(response);
+
+    res.json({ 
+      success: true, 
+      ...content
+    });
+
+  } catch (error) {
+    console.error('Error generating topic content:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate topic content',
+      message: error.message
+    });
+  }
+});
+
+// Generate quiz questions
+app.post('/api/generate-topic-quiz', async (req, res) => {
+  try {
+    if (!genAI) {
+      return res.status(500).json({
+        success: false,
+        error: 'Gemini API not configured',
+        message: 'Please set GEMINI_API_KEY environment variable'
+      });
+    }
+
+    const { topicTitle, topicText, trainingTitle, categories } = req.body;
+    
+    if (!topicTitle) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameter: topicTitle'
+      });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    const prompt = `Generate 3-5 multiple choice quiz questions for healthcare training topic: "${topicTitle}"
+Training: ${trainingTitle || 'Healthcare Training'}
+Topic content: ${topicText || 'Healthcare training content'}
+Categories: ${categories || 'General healthcare'}
+
+Create questions that test practical knowledge and understanding. Each question should have:
+- Clear question text
+- 4 answer options
+- Correct answer indicated
+- Brief explanation of why the answer is correct
+
+Respond in JSON format:
+{
+  "questions": [
+    {
+      "question": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct": 0,
+      "explanation": "Brief explanation of correct answer"
+    }
+  ]
+}
+
+Focus on practical scenarios healthcare staff might encounter.`;
+
+    const result = await model.generateContent(prompt);
+    let response = result.response.text().trim();
+    
+    response = response.replace(/```json\n?/, '').replace(/```\n?$/, '');
+    
+    const quiz = JSON.parse(response);
+
+    res.json({ 
+      success: true, 
+      ...quiz
+    });
+
+  } catch (error) {
+    console.error('Error generating quiz:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate quiz',
+      message: error.message
+    });
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {

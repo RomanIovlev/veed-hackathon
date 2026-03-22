@@ -212,16 +212,28 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
     if (!topic.title) return;
     setAutoGeneratingTopicIds((prev) => new Set(prev).add(topic.id));
     try {
-      const { data, error } = await db.functions.invoke("generate-topic-content", {
-        body: { topicTitle: topic.title, trainingTitle: title, categories: categories.join(", ") },
+      const response = await fetch('http://localhost:3002/api/generate-topic-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          topicTitle: topic.title, 
+          trainingTitle: title, 
+          categories: categories.join(", ") 
+        }),
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || result.message || 'Failed to generate content');
+      }
 
       const newContent: TopicContentBlock[] = [
-        { type: "image", value: "", image_prompt: data.image_prompt || data.imagePrompt || "" },
-        { type: "video", value: "", video_brief: data.video_brief || data.videoSuggestion || "" },
-        { type: "quiz", value: "", quiz: data.quiz || [] },
+        { type: "image", value: "", image_prompt: result.image_prompt || result.imagePrompt || "" },
+        { type: "video", value: "", video_brief: result.video_brief || result.videoSuggestion || "" },
+        { type: "quiz", value: "", quiz: result.quiz || [] },
       ];
 
       setTopics((prev) =>
@@ -229,12 +241,12 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
           t.id === topic.id
             ? {
                 ...t,
-                hook: data.hook || "",
-                keyLearningPoints: data.keyLearningPoints || [],
-                script: data.script || "",
-                callToAction: data.callToAction || "",
-                duration: data.duration || "",
-                priority: data.priority || "",
+                hook: result.hook || "",
+                keyLearningPoints: result.keyLearningPoints || [],
+                script: result.text || "",
+                callToAction: result.callToAction || "",
+                duration: result.duration || "",
+                priority: result.priority || "",
                 content: newContent,
               }
             : t
@@ -314,12 +326,25 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
     setIsGenerating(true);
     setAiSuggestion("");
     try {
-      const { data, error } = await db.functions.invoke("generate-description", {
-        body: { title, category: categories.join(", "), description },
+      const response = await fetch('http://localhost:3002/api/generate-description', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          title, 
+          categories: categories.join(", "),
+          description
+        }),
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setAiSuggestion(data.suggestion || "");
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || result.message || 'Failed to generate description');
+      }
+      
+      setAiSuggestion(result.suggestion || "");
     } catch (e: any) {
       toast({ title: "Failed to generate suggestion", description: e.message, variant: "destructive" });
     } finally {
@@ -371,23 +396,38 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
     setGeneratingQuizTopicId(topicId);
     try {
       const topicText = [topic.script, ...topic.content.filter((b) => b.type === "text").map((b) => b.value)].filter(Boolean).join("\n");
-      const { data, error } = await db.functions.invoke("generate-topic-quiz", {
-        body: { topicTitle: topic.title, topicText, trainingTitle: title, categories: categories.join(", ") },
+      
+      const response = await fetch('http://localhost:3002/api/generate-topic-quiz', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          topicTitle: topic.title, 
+          topicText, 
+          trainingTitle: title, 
+          categories: categories.join(", ") 
+        }),
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (data?.questions?.length) {
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || result.message || 'Failed to generate quiz');
+      }
+      
+      if (result?.questions?.length) {
         setTopics((prev) =>
           prev.map((t) => {
             if (t.id !== topicId) return t;
             const hasQuiz = t.content.some((b) => b.type === "quiz");
             if (hasQuiz) {
-              return { ...t, content: t.content.map((b) => b.type === "quiz" ? { ...b, quiz: data.questions } : b) };
+              return { ...t, content: t.content.map((b) => b.type === "quiz" ? { ...b, quiz: result.questions } : b) };
             }
-            return { ...t, content: [...t.content, { type: "quiz" as const, value: "", quiz: data.questions }] };
+            return { ...t, content: [...t.content, { type: "quiz" as const, value: "", quiz: result.questions }] };
           })
         );
-        toast({ title: `Generated ${data.questions.length} quiz questions` });
+        toast({ title: `Generated ${result.questions.length} quiz questions` });
       }
     } catch (e: any) {
       toast({ title: "Failed to generate quiz", description: e.message, variant: "destructive" });
@@ -404,16 +444,28 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
     }
     setGeneratingAllTopicId(topicId);
     try {
-      const { data, error } = await db.functions.invoke("generate-topic-content", {
-        body: { topicTitle: topic.title, trainingTitle: title, categories: categories.join(", ") },
+      const response = await fetch('http://localhost:3002/api/generate-topic-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          topicTitle: topic.title, 
+          trainingTitle: title, 
+          categories: categories.join(", ") 
+        }),
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || result.message || 'Failed to generate content');
+      }
 
       const newContent: TopicContentBlock[] = [
-        { type: "image", value: "", image_prompt: data.image_prompt || data.imagePrompt || "" },
-        { type: "video", value: "", video_brief: data.video_brief || data.videoSuggestion || "" },
-        { type: "quiz", value: "", quiz: data.quiz || [] },
+        { type: "image", value: "", image_prompt: result.image_prompt || result.imagePrompt || "" },
+        { type: "video", value: "", video_brief: result.video_brief || result.videoSuggestion || "" },
+        { type: "quiz", value: "", quiz: result.quiz || [] },
       ];
 
       setTopics((prev) =>
@@ -421,12 +473,12 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
           t.id === topicId
             ? {
                 ...t,
-                hook: data.hook || "",
-                keyLearningPoints: data.keyLearningPoints || [],
-                script: data.script || "",
-                callToAction: data.callToAction || "",
-                duration: data.duration || "",
-                priority: data.priority || "",
+                hook: result.hook || "",
+                keyLearningPoints: result.keyLearningPoints || [],
+                script: result.text || "",
+                callToAction: result.callToAction || "",
+                duration: result.duration || "",
+                priority: result.priority || "",
                 content: newContent,
               }
             : t
@@ -1068,13 +1120,26 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
                   }
                   setIsGeneratingStructure(true);
                   try {
-                    const { data, error } = await db.functions.invoke("generate-structure", {
-                      body: { title, categories: categories.join(", "), description },
+                    const response = await fetch('http://localhost:3002/api/generate-structure', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ 
+                        title, 
+                        categories: categories.join(", "), 
+                        description 
+                      }),
                     });
-                    if (error) throw error;
-                    if (data?.error) throw new Error(data.error);
-                    if (data?.topics?.length) {
-                      const generated: Topic[] = data.topics.map((t: { title: string; text: string }, i: number) => ({
+                    
+                    const result = await response.json();
+                    
+                    if (!result.success) {
+                      throw new Error(result.error || result.message || 'Failed to generate structure');
+                    }
+                    
+                    if (result?.topics?.length) {
+                      const generated: Topic[] = result.topics.map((t: { title: string; description: string }, i: number) => ({
                         id: Date.now() + i,
                         title: t.title,
                         hook: "",
@@ -1083,7 +1148,7 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
                         callToAction: "",
                         duration: "",
                         priority: "",
-                        content: [{ type: "text" as const, value: t.text }],
+                        content: [{ type: "text" as const, value: t.description }],
                       }));
                       setTopics(generated);
                       setActiveTopicId(generated[0]?.id ?? null);
