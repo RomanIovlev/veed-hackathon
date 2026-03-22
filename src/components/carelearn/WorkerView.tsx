@@ -4,6 +4,12 @@ import { StatusBadge } from "./StatusBadge";
 import { LANGUAGES, TRANSLATIONS } from "@/data/carelearn-data";
 import { localDb as db } from "@/integrations/local/client";
 
+interface ContentBlock {
+  type: string;
+  value: string;
+  quiz?: any[];
+}
+
 interface WorkerTraining {
   id: string;
   title: string;
@@ -15,7 +21,17 @@ interface WorkerTraining {
     hook: string | null;
     duration: string | null;
     keyLearningPoints: string[];
+    contentBlocks: ContentBlock[];
   }[];
+}
+
+interface AuthenticatedUser {
+  id: number;
+  name: string;
+  role: string;
+  user_groups: string[];
+  language_code: string;
+  flag: string;
 }
 
 export function WorkerView() {
@@ -26,6 +42,9 @@ export function WorkerView() {
   const [activeTraining, setActiveTraining] = useState<WorkerTraining | null>(null);
   const [currentTopicIdx, setCurrentTopicIdx] = useState(0);
   const [workerName, setWorkerName] = useState("");
+  const [workerPin, setWorkerPin] = useState("");
+  const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
+  const [loginError, setLoginError] = useState("");
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
 
@@ -35,32 +54,63 @@ export function WorkerView() {
     }
   }, [step]);
 
-  const fetchTrainings = async () => {
+  const handleLogin = async () => {
+    if (!workerName.trim() || !workerPin.trim()) {
+      setLoginError("Please enter both name and PIN");
+      return;
+    }
+    
     setLoading(true);
+    setLoginError("");
+    
     try {
-      const { data: docs } = await db
-        .from("training_documents")
-        .select("id, title");
-
-      if (!docs || docs.length === 0) {
-        setTrainings([]);
-        setLoading(false);
+      const response = await fetch('http://localhost:3002/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: workerName.trim(), pin: workerPin.trim() })
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        setLoginError(result.error || 'Invalid name or PIN');
         return;
       }
+      
+      setCurrentUser(result.data);
+      setLang(result.data.language_code || 'en');
+      setStep("list");
+      console.log('✅ User authenticated:', result.data.name, 'Groups:', result.data.user_groups);
+    } catch (err) {
+      console.error('Login error:', err);
+      setLoginError('Connection failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const { data: scripts } = await db
-        .from("video_scripts")
-        .select("*")
-        .in("document_id", docs.map((d) => d.id))
-        .order("video_number", { ascending: true });
+  const fetchTrainings = async () => {
+    if (!currentUser) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`http://localhost:3002/api/users/${currentUser.id}/trainings`);
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch trainings');
+      }
+      
+      const docs = result.data || [];
+      console.log(`🎯 Fetched ${docs.length} trainings for ${currentUser.name} (groups: ${currentUser.user_groups.join(', ')})`);
 
-      const mapped: WorkerTraining[] = docs.map((doc) => {
-        const docScripts = (scripts || []).filter((s) => s.document_id === doc.id);
+      const mapped: WorkerTraining[] = docs.map((doc: any) => {
+        const videoScripts = doc.video_scripts || [];
         return {
           id: doc.id,
           title: doc.title,
-          category: docScripts[0]?.category || "General",
-          topics: docScripts.map((s) => ({
+          category: videoScripts[0]?.category || "General",
+          topics: videoScripts.map((s: any) => ({
             videoNumber: s.video_number,
             title: s.title,
             script: s.script,
@@ -69,6 +119,7 @@ export function WorkerView() {
             keyLearningPoints: Array.isArray(s.key_learning_points)
               ? (s.key_learning_points as string[])
               : [],
+            contentBlocks: Array.isArray(s.content_blocks) ? s.content_blocks : [],
           })),
         };
       });
@@ -92,8 +143,12 @@ export function WorkerView() {
             setLang={setLang}
             workerName={workerName}
             setWorkerName={setWorkerName}
+            workerPin={workerPin}
+            setWorkerPin={setWorkerPin}
+            loginError={loginError}
+            loading={loading}
             t={t}
-            onLogin={() => setStep("list")}
+            onLogin={handleLogin}
           />
         )}
 
@@ -102,9 +157,17 @@ export function WorkerView() {
           <div className="flex-1 flex flex-col animate-slide-in-right">
             <header className="p-6 pb-2">
               <p className="text-muted-foreground text-sm font-medium">
-                {t.welcome}, {workerName || "Staff"} 👋
+                {t.welcome}, {currentUser?.name || workerName || "Staff"} 👋
               </p>
-              <h2 className="text-2xl font-bold text-foreground">{t.myTrainings}</h2>
+              <p className="text-xs text-muted-foreground font-medium">
+                {currentUser?.role} • Groups: {currentUser?.user_groups.filter(g => g !== 'all-staff').join(', ')}
+              </p>
+              <div className="flex justify-between items-baseline">
+                <h2 className="text-2xl font-bold text-foreground">{t.myTrainings}</h2>
+                <span className="text-sm text-muted-foreground font-medium">
+                  {trainings.length} assigned
+                </span>
+              </div>
             </header>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -114,7 +177,10 @@ export function WorkerView() {
                 </div>
               ) : trainings.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  <p className="font-medium">No trainings assigned yet.</p>
+                  <p className="font-medium">No trainings assigned to your groups.</p>
+                  <p className="text-xs mt-2">
+                    Your groups: {currentUser?.user_groups.filter(g => g !== 'all-staff').join(', ') || 'None'}
+                  </p>
                 </div>
               ) : (
                 trainings.map((tr) => (
@@ -152,7 +218,13 @@ export function WorkerView() {
             <nav className="p-6 border-t border-border flex justify-around items-center">
               <LayoutDashboard className="text-primary" />
               <HelpCircle className="text-muted-foreground/40" />
-              <button onClick={() => setStep("login")}>
+              <button onClick={() => {
+                setCurrentUser(null);
+                setWorkerName("");
+                setWorkerPin("");
+                setLoginError("");
+                setStep("login");
+              }}>
                 <LogOut className="text-muted-foreground/40" />
               </button>
             </nav>
@@ -184,39 +256,50 @@ export function WorkerView() {
             <div className="flex-1 p-6 overflow-y-auto space-y-5">
               <h2 className="text-xl font-bold text-foreground">{currentTopic.title}</h2>
 
-              {currentTopic.hook && (
-                <div className="p-4 bg-accent rounded-2xl border border-primary/20 flex gap-3">
-                  <AlertCircle className="text-primary shrink-0 mt-0.5" size={18} />
-                  <p className="text-sm text-accent-foreground font-medium italic">
-                    {currentTopic.hook}
-                  </p>
-                </div>
-              )}
-
-              {currentTopic.keyLearningPoints.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                    Key Learning Points
-                  </h4>
-                  <ul className="space-y-2">
-                    {currentTopic.keyLearningPoints.map((point, i) => (
-                      <li key={i} className="flex gap-2 items-start text-sm text-foreground">
-                        <CheckCircle2 size={16} className="text-primary shrink-0 mt-0.5" />
-                        <span>{typeof point === 'string' ? point : JSON.stringify(point)}</span>
-                      </li>
+              {currentTopic.contentBlocks && currentTopic.contentBlocks.length > 0 && (
+                <div className="space-y-4">
+                  {currentTopic.contentBlocks
+                    .filter(block => block.type === 'video' || block.type === 'quiz')
+                    .map((block, index) => (
+                      <div key={index}>
+                        {block.type === 'video' && block.value && (
+                          <div className="rounded-xl overflow-hidden bg-muted">
+                            <video 
+                              controls 
+                              className="w-full"
+                              src={`http://localhost:3002${block.value}`}
+                            >
+                              Your browser does not support the video tag.
+                            </video>
+                          </div>
+                        )}
+                        {block.type === 'quiz' && block.quiz && block.quiz.length > 0 && (
+                          <div className="border border-border rounded-xl p-4 space-y-4">
+                            <h4 className="text-sm font-semibold mb-3">Knowledge Check</h4>
+                            {block.quiz.map((question: any, qIndex: number) => (
+                              <div key={qIndex} className="space-y-3">
+                                <p className="font-medium">{question.text}</p>
+                                <div className="space-y-2">
+                                  {question.options.map((option: string, oIndex: number) => (
+                                    option && (
+                                      <label key={oIndex} className="flex items-center space-x-3 cursor-pointer">
+                                        <input 
+                                          type="radio" 
+                                          name={`question-${qIndex}`}
+                                          value={oIndex}
+                                          className="w-4 h-4 text-primary"
+                                        />
+                                        <span className="text-sm">{option}</span>
+                                      </label>
+                                    )
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ))}
-                  </ul>
-                </div>
-              )}
-
-              {currentTopic.script && (
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                    Training Content
-                  </h4>
-                  <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
-                    {currentTopic.script}
-                  </div>
                 </div>
               )}
 
@@ -287,12 +370,16 @@ export function WorkerView() {
 /* ---------- Sub-components ---------- */
 
 function LoginScreen({
-  lang, setLang, workerName, setWorkerName, t, onLogin,
+  lang, setLang, workerName, setWorkerName, workerPin, setWorkerPin, loginError, loading, t, onLogin,
 }: {
   lang: string;
   setLang: (v: string) => void;
   workerName: string;
   setWorkerName: (v: string) => void;
+  workerPin: string;
+  setWorkerPin: (v: string) => void;
+  loginError: string;
+  loading: boolean;
   t: Record<string, string>;
   onLogin: () => void;
 }) {
@@ -302,7 +389,18 @@ function LoginScreen({
         <CheckCircle2 size={32} />
       </div>
       <h1 className="text-2xl font-bold text-center mb-2 text-foreground">CareLearn</h1>
-      <p className="text-muted-foreground text-center mb-10">{t.selectLanguage || "Staff Training Portal"}</p>
+      <p className="text-muted-foreground text-center mb-4">{t.selectLanguage || "Staff Training Portal"}</p>
+      
+      {/* Demo Credentials */}
+      <div className="bg-accent/30 border border-primary/20 rounded-2xl p-3 mb-6">
+        <p className="text-xs font-bold text-foreground mb-2">Demo Accounts:</p>
+        <div className="text-xs space-y-1">
+          <p><strong>Maria Santos</strong> (Carer) - PIN: 1234</p>
+          <p><strong>Ana Popescu</strong> (Senior Carer) - PIN: 2345</p>
+          <p><strong>Dariya Kovalenko</strong> (Nurse) - PIN: 3456</p>
+          <p><strong>Jan de Vries</strong> (Manager) - PIN: 4567</p>
+        </div>
+      </div>
 
       <div className="space-y-4">
         <div>
@@ -332,16 +430,31 @@ function LoginScreen({
           className="w-full p-4 bg-secondary rounded-2xl border-none outline-none font-medium text-foreground placeholder:text-muted-foreground"
         />
         <input
+          value={workerPin}
+          onChange={(e) => setWorkerPin(e.target.value)}
           type="password"
           placeholder={t.pin}
           className="w-full p-4 bg-secondary rounded-2xl border-none outline-none font-medium text-center tracking-[1em] text-foreground placeholder:text-muted-foreground placeholder:tracking-normal"
           maxLength={4}
         />
+        {loginError && (
+          <div className="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-2xl text-sm font-medium">
+            {loginError}
+          </div>
+        )}
         <button
           onClick={onLogin}
-          className="w-full bg-primary text-primary-foreground p-4 rounded-2xl font-bold text-lg shadow-elevated active:scale-95 transition-transform mt-4"
+          disabled={loading}
+          className="w-full bg-primary text-primary-foreground p-4 rounded-2xl font-bold text-lg shadow-elevated active:scale-95 transition-transform mt-4 disabled:opacity-50"
         >
-          {t.login}
+          {loading ? (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 size={20} className="animate-spin" />
+              Signing in...
+            </div>
+          ) : (
+            t.login
+          )}
         </button>
       </div>
     </div>

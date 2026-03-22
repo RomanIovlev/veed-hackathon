@@ -23,12 +23,21 @@ if (!fs.existsSync(audioDir)) {
   fs.mkdirSync(audioDir, { recursive: true });
 }
 
+// Video directory for training videos  
+const videoDir = path.join(__dirname, '..', 'public', 'videos');
+if (!fs.existsSync(videoDir)) {
+  fs.mkdirSync(videoDir, { recursive: true });
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 // Serve static audio files
 app.use('/audio', express.static(audioDir));
+
+// Serve static video files
+app.use('/videos', express.static(videoDir));
 
 // Configure FAL API key - check if it's properly set
 const FAL_KEY = process.env.FAL_KEY;
@@ -416,6 +425,21 @@ app.get('/api/trainings', async (req, res) => {
   }
 });
 
+// Get trainings with their assignment statistics (MUST come before /:id route)
+app.get('/api/trainings/with-stats', async (req, res) => {
+  try {
+    const trainings = await db.getTrainingsWithStats();
+    res.json({ success: true, data: trainings });
+  } catch (error) {
+    console.error('Error fetching trainings with stats:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch trainings with stats',
+      message: error.message 
+    });
+  }
+});
+
 // Get single training document
 app.get('/api/trainings/:id', async (req, res) => {
   try {
@@ -444,6 +468,13 @@ app.get('/api/trainings/:id', async (req, res) => {
 app.post('/api/trainings', async (req, res) => {
   try {
     const training = await db.createTrainingDocument(req.body);
+    
+    // Auto-assign training to users based on selected groups
+    if (training && training.assigned_to_groups && training.assigned_to_groups.length > 0) {
+      await db.assignTrainingToGroups(training.id, training.assigned_to_groups);
+      console.log(`✅ Training "${training.title}" assigned to groups:`, training.assigned_to_groups);
+    }
+    
     res.json({ success: true, data: training });
   } catch (error) {
     console.error('Error creating training:', error);
@@ -466,6 +497,12 @@ app.put('/api/trainings/:id', async (req, res) => {
         success: false, 
         error: 'Training not found' 
       });
+    }
+    
+    // Update training assignments based on new group selection
+    if (training.assigned_to_groups && training.assigned_to_groups.length > 0) {
+      await db.updateTrainingGroupAssignments(id, training.assigned_to_groups);
+      console.log(`🔄 Training "${training.title}" assignments updated for groups:`, training.assigned_to_groups);
     }
     
     res.json({ success: true, data: training });
@@ -576,6 +613,70 @@ app.get('/api/users', async (req, res) => {
     });
   }
 });
+
+// User authentication endpoint
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { name, pin } = req.body;
+    
+    if (!name || !pin) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Name and PIN are required' 
+      });
+    }
+    
+    const user = await db.authenticateUser(name, pin);
+    
+    if (!user) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Invalid name or PIN' 
+      });
+    }
+    
+    res.json({ success: true, data: user });
+  } catch (error) {
+    console.error('Error authenticating user:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Authentication failed',
+      message: error.message 
+    });
+  }
+});
+
+// Get trainings assigned to user's groups
+app.get('/api/users/:userId/trainings', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const trainings = await db.getUserAssignedTrainings(userId);
+    res.json({ success: true, data: trainings });
+  } catch (error) {
+    console.error('Error fetching user trainings:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch user trainings',
+      message: error.message 
+    });
+  }
+});
+
+// Get assignment statistics for dashboard
+app.get('/api/stats/assignments', async (req, res) => {
+  try {
+    const stats = await db.getAssignmentStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    console.error('Error fetching assignment stats:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch assignment stats',
+      message: error.message 
+    });
+  }
+});
+
 
 // Error handling middleware
 app.use((error, req, res, next) => {

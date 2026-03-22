@@ -8,6 +8,28 @@ A web application for managing staff training, built with React, TypeScript, and
 - **Backend:** Node.js + Express API
 - **Database:** PostgreSQL (Docker)
 
+## Quick Start
+
+### Mac/Linux
+
+```bash
+npm install
+./start-db.sh
+cd backend && npm install && npm run dev
+npm run dev
+```
+
+### Windows
+
+```cmd
+npm install
+docker-compose up -d
+cd backend && npm install && npm run dev
+npm run dev
+```
+
+Open `http://localhost:5173` for frontend and `http://localhost:3001` for backend API.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18+) or [Bun](https://bun.sh/)

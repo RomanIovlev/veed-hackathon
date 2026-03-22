@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Users, CheckCircle2, AlertCircle, Pencil, Trash2, AlertTriangle, Loader2, Filter } from "lucide-react";
 import { StatCard } from "./StatCard";
 import { StatusBadge } from "./StatusBadge";
@@ -30,15 +30,50 @@ export function DashboardContent({ trainings, staff, loading, onEdit, onRefresh 
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [assignmentStats, setAssignmentStats] = useState({
+    total_assignments: 0,
+    total_completed: 0,
+    completion_rate: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Filter trainings based on selected category
   const filteredTrainings = activeFilter === "all" 
     ? trainings 
     : trainings.filter((t) => t.categories.includes(activeFilter));
 
-  const totalAssigned = staff.reduce((sum, s) => sum + s.assigned, 0);
-  const totalCompleted = staff.reduce((sum, s) => sum + s.completed, 0);
-  const completionRate = totalAssigned > 0 ? Math.round((totalCompleted / totalAssigned) * 100) : 0;
+  const fetchAssignmentStats = async () => {
+    try {
+      setStatsLoading(true);
+      const response = await fetch('http://localhost:3002/api/stats/assignments');
+      const result = await response.json();
+      
+      if (result.success) {
+        setAssignmentStats(result.data);
+        console.log('📊 Assignment stats loaded:', result.data);
+      }
+    } catch (err) {
+      console.error('Error fetching assignment stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Fetch real assignment statistics from database
+  useEffect(() => {
+    fetchAssignmentStats();
+  }, []); // Run once on component mount
+
+  // Refresh stats when trainings change
+  useEffect(() => {
+    if (trainings.length > 0 && !loading) {
+      fetchAssignmentStats();
+    }
+  }, [trainings.length]); // Only depend on the count of trainings
+
+  const totalAssigned = assignmentStats.total_assignments;
+  const totalCompleted = assignmentStats.total_completed;
+  const completionRate = assignmentStats.completion_rate;
   const overdueCount = trainings.filter((t) => t.status === "Overdue").length;
 
   const handleDelete = async (id: string) => {
@@ -68,8 +103,16 @@ export function DashboardContent({ trainings, staff, loading, onEdit, onRefresh 
     <div className="space-y-8 animate-fade-in">
       <div className="grid grid-cols-4 gap-6">
         <StatCard label="Total Trainings" value={String(trainings.length)} icon={<FileText className="text-primary" size={20} />} />
-        <StatCard label="Staff Assigned" value={String(totalAssigned)} icon={<Users className="text-blue-600" size={20} />} />
-        <StatCard label="Completion Rate" value={`${completionRate}%`} icon={<CheckCircle2 className="text-success" size={20} />} />
+        <StatCard 
+          label="Staff Assigned" 
+          value={statsLoading ? "..." : String(totalAssigned)} 
+          icon={<Users className="text-blue-600" size={20} />} 
+        />
+        <StatCard 
+          label="Completion Rate" 
+          value={statsLoading ? "..." : `${completionRate}%`} 
+          icon={<CheckCircle2 className="text-success" size={20} />} 
+        />
         <StatCard label="Overdue" value={String(overdueCount)} icon={<AlertCircle className="text-destructive" size={20} />} />
       </div>
 

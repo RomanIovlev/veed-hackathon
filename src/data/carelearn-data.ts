@@ -14,6 +14,7 @@ export interface StaffMember {
   completed: number;
   assigned: number;
   lastActive: string;
+  groups: string[]; // User group IDs this staff member belongs to
 }
 
 export interface Training {
@@ -133,11 +134,11 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 export const INITIAL_STAFF: StaffMember[] = [
-  { id: 1, name: "Maria Santos", role: "Carer", email: "maria@care.nl", lang: "tl", flag: "🇵🇭", completed: 2, assigned: 3, lastActive: "2h ago" },
-  { id: 2, name: "Ana Popescu", role: "Senior Carer", email: "ana@care.nl", lang: "ro", flag: "🇷🇴", completed: 3, assigned: 3, lastActive: "1d ago" },
-  { id: 3, name: "Dariya Kovalenko", role: "Nurse", email: "dariya@care.nl", lang: "uk", flag: "🇺🇦", completed: 1, assigned: 3, lastActive: "3h ago" },
-  { id: 4, name: "Jan de Vries", role: "Manager", email: "jan@care.nl", lang: "nl", flag: "🇳🇱", completed: 3, assigned: 3, lastActive: "Now" },
-  { id: 5, name: "Fatima Zahra", role: "Carer", email: "fatima@care.nl", lang: "ar", flag: "🇸🇦", completed: 0, assigned: 3, lastActive: "4d ago" },
+  { id: 1, name: "Maria Santos", role: "Carer", email: "maria@care.nl", lang: "tl", flag: "🇵🇭", completed: 2, assigned: 2, lastActive: "2h ago", groups: ["carer", "all-staff"] },
+  { id: 2, name: "Ana Popescu", role: "Senior Carer", email: "ana@care.nl", lang: "ro", flag: "🇷🇴", completed: 1, assigned: 2, lastActive: "1d ago", groups: ["senior-carer", "all-staff"] },
+  { id: 3, name: "Dariya Kovalenko", role: "Nurse", email: "dariya@care.nl", lang: "uk", flag: "🇺🇦", completed: 0, assigned: 2, lastActive: "3h ago", groups: ["nurse", "all-staff"] },
+  { id: 4, name: "Jan de Vries", role: "Manager", email: "jan@care.nl", lang: "nl", flag: "🇳🇱", completed: 0, assigned: 0, lastActive: "Now", groups: ["manager", "all-staff"] },
+  { id: 5, name: "Fatima Zahra", role: "Carer", email: "fatima@care.nl", lang: "ar", flag: "🇸🇦", completed: 0, assigned: 2, lastActive: "4d ago", groups: ["carer", "all-staff"] },
 ];
 
 export const INITIAL_TRAININGS: Training[] = [

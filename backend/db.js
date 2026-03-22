@@ -267,6 +267,158 @@ export const db = {
     return result.rows;
   },
 
+  // Authenticate user by name and PIN
+  async authenticateUser(name, pin) {
+    const query = 'SELECT * FROM users WHERE name = $1 AND pin = $2';
+    const result = await this.query(query, [name, pin]);
+    return result.rows[0] || null;
+  },
+
+  // Get trainings assigned to a user based on their group membership
+  async getUserAssignedTrainings(userId) {
+    try {
+      // First, get the user's groups
+      const userQuery = 'SELECT user_groups FROM users WHERE id = $1';
+      const userResult = await this.query(userQuery, [userId]);
+      
+      if (!userResult.rows.length) {
+        return [];
+      }
+      
+      const userGroups = userResult.rows[0].user_groups || [];
+      console.log(`👤 User ${userId} groups:`, userGroups);
+      
+      // Then get trainings assigned to any of the user's groups
+      const trainingsQuery = `
+        SELECT 
+          td.id,
+          td.title,
+          td.description,
+          td.categories,
+          td.cover_image_url,
+          td.status,
+          td.due_date,
+          td.duration,
+          td.assigned_to_groups
+        FROM training_documents td
+        WHERE td.assigned_to_groups && $1
+           OR 'all-staff' = ANY(td.assigned_to_groups)
+        ORDER BY td.created_at DESC
+      `;
+      
+      const trainingsResult = await this.query(trainingsQuery, [userGroups]);
+      console.log(`🎯 Found ${trainingsResult.rows.length} trainings for user ${userId}`);
+      
+      // Get video scripts for each training
+      const trainingsWithScripts = [];
+      for (const training of trainingsResult.rows) {
+        const scriptsQuery = `
+          SELECT * FROM video_scripts 
+          WHERE document_id = $1 
+          ORDER BY video_number
+        `;
+        const scriptsResult = await this.query(scriptsQuery, [training.id]);
+        
+        trainingsWithScripts.push({
+          ...training,
+          video_scripts: scriptsResult.rows
+        });
+      }
+      
+      return trainingsWithScripts;
+    } catch (error) {
+      console.error('Error in getUserAssignedTrainings:', error);
+      throw error;
+    }
+  },
+
+  // Get assignment statistics for dashboard
+  async getAssignmentStats() {
+    const query = `
+      SELECT 
+        COUNT(DISTINCT uta.user_id) as total_users,
+        COUNT(DISTINCT uta.training_id) as total_trainings,
+        COUNT(*) as total_assignments,
+        COUNT(CASE WHEN uta.status = 'completed' THEN 1 END) as total_completed,
+        ROUND(
+          (COUNT(CASE WHEN uta.status = 'completed' THEN 1 END)::numeric / 
+           NULLIF(COUNT(*), 0)::numeric) * 100
+        ) as completion_rate
+      FROM user_training_assignments uta
+    `;
+    
+    const result = await this.query(query);
+    return result.rows[0];
+  },
+
+  // Assign training to users based on group membership
+  async assignTrainingToGroups(trainingId, groupIds) {
+    // Remove existing assignments for this training
+    await this.query(
+      'DELETE FROM user_training_assignments WHERE training_id = $1',
+      [trainingId]
+    );
+    
+    // Get all users who belong to any of the specified groups
+    const usersQuery = `
+      SELECT DISTINCT id 
+      FROM users 
+      WHERE user_groups && $1
+    `;
+    
+    const usersResult = await this.query(usersQuery, [groupIds]);
+    
+    // Create new assignments for matching users
+    for (const user of usersResult.rows) {
+      await this.query(
+        'INSERT INTO user_training_assignments (user_id, training_id, status) VALUES ($1, $2, $3) ON CONFLICT (user_id, training_id) DO NOTHING',
+        [user.id, trainingId, 'assigned']
+      );
+    }
+    
+    console.log(`📋 Assigned training ${trainingId} to ${usersResult.rows.length} users in groups:`, groupIds);
+    return usersResult.rows.length;
+  },
+
+  // Update training group assignments
+  async updateTrainingGroupAssignments(trainingId, groupIds) {
+    return this.assignTrainingToGroups(trainingId, groupIds);
+  },
+
+  // Get all trainings with their assignment statistics  
+  async getTrainingsWithStats() {
+    try {
+      // First get all trainings
+      const trainingsQuery = 'SELECT * FROM training_documents ORDER BY created_at DESC';
+      const trainingsResult = await this.query(trainingsQuery);
+      
+      // Then get assignment stats for each training
+      const trainingsWithStats = [];
+      for (const training of trainingsResult.rows) {
+        const statsQuery = `
+          SELECT 
+            COUNT(DISTINCT user_id) as assigned,
+            COUNT(DISTINCT CASE WHEN status = 'completed' THEN user_id END) as completed
+          FROM user_training_assignments 
+          WHERE training_id = $1
+        `;
+        const statsResult = await this.query(statsQuery, [training.id]);
+        const stats = statsResult.rows[0];
+        
+        trainingsWithStats.push({
+          ...training,
+          assigned: parseInt(stats.assigned) || 0,
+          completed: parseInt(stats.completed) || 0
+        });
+      }
+      
+      return trainingsWithStats;
+    } catch (error) {
+      console.error('Error in getTrainingsWithStats:', error);
+      throw error;
+    }
+  },
+
   // Close the database connection pool
   async close() {
     await pool.end();

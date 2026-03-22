@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     role VARCHAR(100) NOT NULL,
+    user_groups TEXT[], -- Array of group IDs this user belongs to
     language_code VARCHAR(10) DEFAULT 'en',
     flag VARCHAR(10) DEFAULT '🇬🇧',
     pin VARCHAR(10) DEFAULT '0000',

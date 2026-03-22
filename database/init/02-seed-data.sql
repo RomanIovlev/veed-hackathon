@@ -1,12 +1,12 @@
 -- Seed data for Training Hackathon Local Database
 
--- Insert users (staff members)
-INSERT INTO users (id, name, email, role, language_code, flag, pin, completed_trainings, assigned_trainings, last_active) VALUES
-(1, 'Maria Santos', 'maria@care.nl', 'Carer', 'tl', '🇵🇭', '1234', 2, 3, CURRENT_TIMESTAMP - INTERVAL '2 hours'),
-(2, 'Ana Popescu', 'ana@care.nl', 'Senior Carer', 'ro', '🇷🇴', '2345', 3, 3, CURRENT_TIMESTAMP - INTERVAL '1 day'),
-(3, 'Dariya Kovalenko', 'dariya@care.nl', 'Nurse', 'uk', '🇺🇦', '3456', 1, 3, CURRENT_TIMESTAMP - INTERVAL '3 hours'),
-(4, 'Jan de Vries', 'jan@care.nl', 'Manager', 'nl', '🇳🇱', '4567', 3, 3, CURRENT_TIMESTAMP),
-(5, 'Fatima Zahra', 'fatima@care.nl', 'Carer', 'ar', '🇸🇦', '5678', 0, 3, CURRENT_TIMESTAMP - INTERVAL '4 days');
+-- Insert users (staff members) with group assignments
+INSERT INTO users (id, name, email, role, user_groups, language_code, flag, pin, completed_trainings, assigned_trainings, last_active) VALUES
+(1, 'Maria Santos', 'maria@care.nl', 'Carer', ARRAY['carer', 'all-staff'], 'tl', '🇵🇭', '1234', 2, 2, CURRENT_TIMESTAMP - INTERVAL '2 hours'),
+(2, 'Ana Popescu', 'ana@care.nl', 'Senior Carer', ARRAY['senior-carer', 'all-staff'], 'ro', '🇷🇴', '2345', 1, 2, CURRENT_TIMESTAMP - INTERVAL '1 day'),
+(3, 'Dariya Kovalenko', 'dariya@care.nl', 'Nurse', ARRAY['nurse', 'all-staff'], 'uk', '🇺🇦', '3456', 0, 2, CURRENT_TIMESTAMP - INTERVAL '3 hours'),
+(4, 'Jan de Vries', 'jan@care.nl', 'Manager', ARRAY['manager', 'all-staff'], 'nl', '🇳🇱', '4567', 0, 0, CURRENT_TIMESTAMP),
+(5, 'Fatima Zahra', 'fatima@care.nl', 'Carer', ARRAY['carer', 'all-staff'], 'ar', '🇸🇦', '5678', 0, 2, CURRENT_TIMESTAMP - INTERVAL '4 days');
 
 -- Insert demo training documents with Dr House as default presenter
 INSERT INTO training_documents (id, title, description, categories, languages, cover_image_url, assigned_to_groups, duration, status, due_date, notes) VALUES
@@ -55,12 +55,16 @@ BEGIN
         'Introduction to Hand Hygiene',
         'infection-control',
         'Did you know that proper hand hygiene can prevent up to 80% of healthcare-associated infections?',
-        '[VISUAL: Healthcare worker washing hands]\n\nNARRATOR: Hand hygiene is the single most important measure to prevent the spread of infections in healthcare settings. Today we''ll learn the essential steps that protect both patients and healthcare workers.\n\n[VISUAL: Infection transmission diagram]\n\nEvery day, healthcare workers'' hands come into contact with countless surfaces and patients. Without proper hygiene, these hands become vehicles for dangerous pathogens.',
+        'Hand hygiene is the single most important measure to prevent the spread of infections in healthcare settings. Today we will learn the essential steps that protect both patients and healthcare workers.
+
+Every day, healthcare workers hands come into contact with countless surfaces and patients. Without proper hygiene, these hands become vehicles for dangerous pathogens.
+
+Proper hand hygiene is your first line of defense against healthcare-associated infections.',
         'Remember: Clean hands save lives. Make hand hygiene your priority.',
         '3 minutes',
         'High',
         '["Understand the importance of hand hygiene", "Learn when hand hygiene is required", "Recognize the consequences of poor hand hygiene"]'::jsonb,
-        '[{"type": "quiz", "value": "", "quiz": []}]'::jsonb
+        '[{"type": "video", "value": "/videos/hand-hygiene-video.mp4"}, {"type": "quiz", "value": "", "quiz": []}]'::jsonb
     ),
     (
         hand_hygiene_id,
@@ -68,7 +72,16 @@ BEGIN
         'Handwashing Technique',
         'infection-control',
         'The difference between adequate and excellent hand hygiene lies in the technique.',
-        '[VISUAL: Step-by-step handwashing demonstration]\n\nNARRATOR: Follow these essential steps for effective handwashing:\n\n1. Wet your hands with clean, running water\n2. Apply soap and lather well\n3. Scrub all surfaces for at least 20 seconds\n\n[VISUAL: Close-up of scrubbing technique]\n\nPay special attention to areas often missed: between fingers, under nails, thumbs, and wrists.\n\n[VISUAL: Proper drying technique]\n\n4. Rinse thoroughly\n5. Dry with a clean towel or air dry',
+        'Follow these essential steps for effective handwashing:
+
+1. Wet your hands with clean, running water
+2. Apply soap and lather well
+3. Scrub all surfaces for at least 20 seconds
+4. Pay special attention to areas often missed: between fingers, under nails, thumbs, and wrists
+5. Rinse thoroughly
+6. Dry with a clean towel or air dry
+
+The entire process should take at least 20 seconds to be effective. Count slowly to ensure proper timing.',
         'Practice makes perfect. Master this technique and use it consistently.',
         '4 minutes',
         'High',
@@ -84,12 +97,23 @@ BEGIN
         'Principles of Safe Manual Handling',
         'manual-handling',
         'Back injuries account for over 40% of healthcare worker injuries. Learn how to protect yourself.',
-        '[VISUAL: Healthcare worker assessing a patient]\n\nNARRATOR: Before any manual handling task, always start with assessment. Consider the patient''s mobility, weight, and any medical conditions that might affect the transfer.\n\n[VISUAL: Risk assessment checklist]\n\nAsk yourself: Can the patient help? Do I need assistance? What equipment is available?\n\n[VISUAL: Proper lifting posture demonstration]\n\nRemember the golden rule: keep your back straight, bend your knees, and keep the load close to your body.',
+        'Before any manual handling task, always start with assessment. Consider the patient mobility, weight, and any medical conditions that might affect the transfer.
+
+Ask yourself: Can the patient help? Do I need assistance? What equipment is available?
+
+Remember the golden rule: keep your back straight, bend your knees, and keep the load close to your body.
+
+Key safety principles:
+- Never lift alone if the patient cannot support their own weight
+- Use mechanical aids whenever possible
+- Communicate with the patient throughout the process
+- Plan your route before moving
+- Take breaks if needed during longer transfers',
         'Always assess before you act. Your safety and the patient''s safety depend on it.',
         '5 minutes',
         'High',
         '["Conduct proper risk assessment", "Understand body mechanics", "Know when to seek assistance"]'::jsonb,
-        '[{"type": "quiz", "value": "", "quiz": []}]'::jsonb
+        '[{"type": "video", "value": "/videos/manual-handling-video.mp4"}, {"type": "quiz", "value": "", "quiz": []}]'::jsonb
     );
     
     -- Insert quiz questions for Hand Hygiene Protocol
@@ -108,11 +132,17 @@ BEGIN
     (manual_handling_id, 'How many people are needed for a two-person lift?', '["1", "2", "3", "4"]'::jsonb, 1),
     (manual_handling_id, 'What is the first step in moving a patient?', '["Grab and pull", "Communicate with the patient", "Call a supervisor", "Check the floor"]'::jsonb, 1);
     
-    -- Assign trainings to users
+    -- Assign trainings to users based on group membership
+    -- Hand Hygiene Protocol: assigned to carer, senior-carer, nurse groups
     INSERT INTO user_training_assignments (user_id, training_id, status) 
-    SELECT u.id, hand_hygiene_id, 'assigned' FROM users u WHERE u.role IN ('Carer', 'Senior Carer', 'Nurse');
+    SELECT u.id, hand_hygiene_id, 'assigned' 
+    FROM users u 
+    WHERE u.user_groups && ARRAY['carer', 'senior-carer', 'nurse'];
     
+    -- Manual Handling Techniques: assigned to carer, senior-carer, nurse groups  
     INSERT INTO user_training_assignments (user_id, training_id, status) 
-    SELECT u.id, manual_handling_id, 'assigned' FROM users u WHERE u.role IN ('Carer', 'Senior Carer', 'Nurse');
+    SELECT u.id, manual_handling_id, 'assigned' 
+    FROM users u 
+    WHERE u.user_groups && ARRAY['carer', 'senior-carer', 'nurse'];
     
 END $$;

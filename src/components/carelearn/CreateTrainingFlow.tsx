@@ -130,17 +130,6 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
   const [isLoadingEdit, setIsLoadingEdit] = useState(!!editingDocumentId);
   const isEditing = !!editingDocumentId;
 
-  // Debug: Log coverImage state changes and selected doctor
-  useEffect(() => {
-    const selectedDoctor = getSelectedDoctor(coverImage);
-    console.log('🔍 DEBUG - coverImage state changed:', {
-      exists: !!coverImage,
-      selectedDoctor: selectedDoctor.name,
-      doctorId: selectedDoctor.id,
-      isEditing: isEditing,
-      imageUrl: coverImage
-    });
-  }, [coverImage, isEditing]);
 
   // Load existing training data when editing
   useEffect(() => {
@@ -155,25 +144,11 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
           .single();
 
         if (doc) {
-          console.log('🔍 DEBUG - Loading training document:', {
-            id: doc.id,
-            title: doc.title,
-            cover_image_url: doc.cover_image_url,
-            cover_image_type: typeof doc.cover_image_url,
-            cover_image_length: doc.cover_image_url?.length || 0,
-            all_fields: Object.keys(doc)
-          });
           
           setTitle(doc.title || "");
           setDescription(doc.description || "");
           const coverImageValue = ensureValidDoctorImage(doc.cover_image_url || DOCTOR_ROLES[0].imageUrl);
           const selectedDoctor = getSelectedDoctor(coverImageValue);
-          console.log('📸 Setting cover image from DB:', {
-            raw_value: doc.cover_image_url,
-            processed_value: coverImageValue,
-            selectedDoctor: selectedDoctor.name,
-            defaulting_to_dr_house: !doc.cover_image_url
-          });
           setCoverImage(coverImageValue);
           
           // Load categories from document
@@ -605,17 +580,6 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
       // Continue with Dr House
     }
 
-    // Debug: Check what we have in coverImage state
-    console.log('🔍 DEBUG - coverImage state at video generation:', {
-      exists: !!coverImage,
-      type: typeof coverImage,
-      length: coverImage?.length || 0,
-      startsWithData: coverImage?.startsWith('data:') || false,
-      preview: coverImage ? coverImage.substring(0, 50) + '...' : 'UNDEFINED',
-      exactValue: coverImage,
-      isEditing: isEditing,
-      editingDocumentId: editingDocumentId
-    });
 
     // ⭐ FINAL DOCTOR CONFIRMATION (use the guaranteed values from above)
     const finalSelectedDoctor = getSelectedDoctor(coverImage);
