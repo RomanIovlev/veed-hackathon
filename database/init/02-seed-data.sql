@@ -8,14 +8,15 @@ INSERT INTO users (id, name, email, role, language_code, flag, pin, completed_tr
 (4, 'Jan de Vries', 'jan@care.nl', 'Manager', 'nl', '🇳🇱', '4567', 3, 3, CURRENT_TIMESTAMP),
 (5, 'Fatima Zahra', 'fatima@care.nl', 'Carer', 'ar', '🇸🇦', '5678', 0, 3, CURRENT_TIMESTAMP - INTERVAL '4 days');
 
--- Insert demo training documents
-INSERT INTO training_documents (id, title, description, categories, languages, assigned_to_groups, duration, status, due_date, notes) VALUES
+-- Insert demo training documents with Dr House as default presenter
+INSERT INTO training_documents (id, title, description, categories, languages, cover_image_url, assigned_to_groups, duration, status, due_date, notes) VALUES
 (
     uuid_generate_v4(),
     'Hand Hygiene Protocol',
     'Essential hand washing and sanitization procedures for infection prevention. This training covers the WHO 5 Moments for Hand Hygiene, proper handwashing technique, when to use alcohol-based hand rub, and common mistakes to avoid.',
-    ARRAY['Infection Control', 'Patient Safety'],
+    ARRAY['infection-control'],
     ARRAY['en', 'ro', 'tl', 'uk'],
+    'https://static.wikia.nocookie.net/angelsandasses/images/b/b1/Lisa_Edelstein.jpg/revision/latest?cb=20100726212055',
     ARRAY['carer', 'senior-carer', 'nurse'],
     12,
     'Active',
@@ -26,8 +27,9 @@ INSERT INTO training_documents (id, title, description, categories, languages, a
     uuid_generate_v4(),
     'Manual Handling Techniques',
     'Proper lifting, moving, and positioning of patients to prevent injury to both patients and healthcare workers. Learn about risk assessment, mechanical aids, team lifting techniques, and injury prevention strategies.',
-    ARRAY['Patient Handling', 'Health & Safety'],
+    ARRAY['manual-handling'],
     ARRAY['en', 'nl', 'tl'],
+    'https://i.namu.wiki/i/pfQI_YQJjWbOsOPPuY08xJuC3AJ2u3RMVelZl8odCGEwEK7_zk0arCvS585VQWtKUqHamP9qWVUehTgG28rCOOGfR6lsQq4aj5cxIVMig1mhdbrAi7RvCYybYRueNqbyL96ReNnEpUbgoEQv-gzFOqiG4FRDxHDO2xM87_uvkLk.webp',
     ARRAY['carer', 'senior-carer', 'nurse'],
     18,
     'Active',
@@ -51,7 +53,7 @@ BEGIN
         hand_hygiene_id,
         1,
         'Introduction to Hand Hygiene',
-        'Infection Control',
+        'infection-control',
         'Did you know that proper hand hygiene can prevent up to 80% of healthcare-associated infections?',
         '[VISUAL: Healthcare worker washing hands]\n\nNARRATOR: Hand hygiene is the single most important measure to prevent the spread of infections in healthcare settings. Today we''ll learn the essential steps that protect both patients and healthcare workers.\n\n[VISUAL: Infection transmission diagram]\n\nEvery day, healthcare workers'' hands come into contact with countless surfaces and patients. Without proper hygiene, these hands become vehicles for dangerous pathogens.',
         'Remember: Clean hands save lives. Make hand hygiene your priority.',
@@ -64,7 +66,7 @@ BEGIN
         hand_hygiene_id,
         2,
         'Handwashing Technique',
-        'Infection Control',
+        'infection-control',
         'The difference between adequate and excellent hand hygiene lies in the technique.',
         '[VISUAL: Step-by-step handwashing demonstration]\n\nNARRATOR: Follow these essential steps for effective handwashing:\n\n1. Wet your hands with clean, running water\n2. Apply soap and lather well\n3. Scrub all surfaces for at least 20 seconds\n\n[VISUAL: Close-up of scrubbing technique]\n\nPay special attention to areas often missed: between fingers, under nails, thumbs, and wrists.\n\n[VISUAL: Proper drying technique]\n\n4. Rinse thoroughly\n5. Dry with a clean towel or air dry',
         'Practice makes perfect. Master this technique and use it consistently.',
@@ -80,7 +82,7 @@ BEGIN
         manual_handling_id,
         1,
         'Principles of Safe Manual Handling',
-        'Patient Handling',
+        'manual-handling',
         'Back injuries account for over 40% of healthcare worker injuries. Learn how to protect yourself.',
         '[VISUAL: Healthcare worker assessing a patient]\n\nNARRATOR: Before any manual handling task, always start with assessment. Consider the patient''s mobility, weight, and any medical conditions that might affect the transfer.\n\n[VISUAL: Risk assessment checklist]\n\nAsk yourself: Can the patient help? Do I need assistance? What equipment is available?\n\n[VISUAL: Proper lifting posture demonstration]\n\nRemember the golden rule: keep your back straight, bend your knees, and keep the load close to your body.',
         'Always assess before you act. Your safety and the patient''s safety depend on it.',

@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { LayoutDashboard, Users, CheckCircle2, Plus, BookOpen, Palette } from "lucide-react";
+import { LayoutDashboard, Users, CheckCircle2, Plus, Palette } from "lucide-react";
 import { DashboardContent } from "./DashboardContent";
 import { StaffContent } from "./StaffContent";
-import { PublishedTrainings } from "./PublishedTrainings";
 import { CreateTrainingFlow } from "./CreateTrainingFlow";
 import { BrandingKnowledge } from "./BrandingKnowledge";
 import { Training, StaffMember } from "@/data/carelearn-data";
@@ -31,7 +30,7 @@ function NavItem({ active, icon, label, onClick }: { active: boolean; icon: Reac
 }
 
 export function ManagerPortal({ trainings, staff, onAddTraining, onAddStaff, onRefreshTrainings, loading }: ManagerPortalProps) {
-  const [tab, setTab] = useState<"dashboard" | "trainings" | "staff" | "branding">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "staff" | "branding">("dashboard");
   const [isCreating, setIsCreating] = useState(false);
   const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
 
@@ -53,14 +52,12 @@ export function ManagerPortal({ trainings, staff, onAddTraining, onAddStaff, onR
 
   const titles: Record<string, string> = {
     dashboard: "Training Overview",
-    trainings: "Published Trainings",
     staff: "Staff Directory",
     branding: "Branding & Knowledge",
   };
 
   const subtitles: Record<string, string> = {
     dashboard: "Manage your facility's compliance and education.",
-    trainings: "Browse and manage all published training modules.",
     staff: "Manage your team members and their progress.",
     branding: "Upload company assets and documentation for AI-personalised content.",
   };
@@ -77,7 +74,6 @@ export function ManagerPortal({ trainings, staff, onAddTraining, onAddStaff, onR
 
         <nav className="space-y-1 flex-1">
           <NavItem active={tab === "dashboard"} onClick={() => setTab("dashboard")} icon={<LayoutDashboard size={18} />} label="Dashboard" />
-          <NavItem active={tab === "trainings"} onClick={() => setTab("trainings")} icon={<BookOpen size={18} />} label="Trainings" />
           <NavItem active={tab === "staff"} onClick={() => setTab("staff")} icon={<Users size={18} />} label="Staff Management" />
           <NavItem active={tab === "branding"} onClick={() => setTab("branding")} icon={<Palette size={18} />} label="Branding & Knowledge" />
         </nav>
@@ -97,7 +93,7 @@ export function ManagerPortal({ trainings, staff, onAddTraining, onAddStaff, onR
             <h1 className="text-2xl font-bold text-foreground">{titles[tab]}</h1>
             <p className="text-muted-foreground">{subtitles[tab]}</p>
           </div>
-          {(tab === "dashboard" || tab === "trainings") && (
+          {tab === "dashboard" && (
             <button
               onClick={() => setIsCreating(true)}
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all shadow-soft active:scale-95"
@@ -108,13 +104,7 @@ export function ManagerPortal({ trainings, staff, onAddTraining, onAddStaff, onR
           )}
         </header>
 
-        {tab === "dashboard" && <DashboardContent trainings={trainings} staff={staff} loading={loading} />}
-        {tab === "trainings" && (
-          <PublishedTrainings 
-            onEdit={(docId) => setEditingDocumentId(docId)} 
-            onRefresh={onRefreshTrainings}
-          />
-        )}
+        {tab === "dashboard" && <DashboardContent trainings={trainings} staff={staff} loading={loading} onEdit={(docId) => setEditingDocumentId(docId)} onRefresh={onRefreshTrainings} />}
         {tab === "staff" && <StaffContent staff={staff} trainings={trainings} onAddStaff={onAddStaff} />}
         {tab === "branding" && <BrandingKnowledge />}
       </main>

@@ -1,9 +1,63 @@
-import { useState, useEffect, useRef } from "react";
-import { X, Check, Video, Trash2, Sparkles, Loader2, Plus, FileText, Image, ChevronRight, ChevronDown, HelpCircle, Clock, Flag, MessageSquareQuote, ListChecks, Clapperboard, Target, Eye, Upload, Users } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Check, Video, Trash2, Sparkles, Loader2, Plus, FileText, Image, ChevronRight, ChevronDown, HelpCircle, Clock, Flag, MessageSquareQuote, ListChecks, Clapperboard, Target, Eye, Users } from "lucide-react";
 import { localDb as db } from "@/integrations/local/client";
 import { toast } from "@/hooks/use-toast";
 import { Training, StaffMember, LANGUAGES, QuizQuestion, UserGroup, USER_GROUPS } from "@/data/carelearn-data";
 import { TRAINING_CATEGORIES, getCategoryById } from "@/config/trainingCategories";
+
+// Doctor roles for role selection
+const DOCTOR_ROLES = [
+  {
+    id: "dr-house",
+    name: "Dr House",
+    imageUrl: "https://miro.medium.com/v2/resize:fit:3840/format:webp/1*zCw9YQICYZzozYZsqeIiYA.png"
+  },
+  {
+    id: "dr-cuddy", 
+    name: "Dr. Lisa Cuddy",
+    imageUrl: "https://static.wikia.nocookie.net/angelsandasses/images/b/b1/Lisa_Edelstein.jpg/revision/latest?cb=20100726212055"
+  },
+  {
+    id: "dr-foreman",
+    name: "Dr. Eric Foreman", 
+    imageUrl: "https://i.namu.wiki/i/pfQI_YQJjWbOsOPPuY08xJuC3AJ2u3RMVelZl8odCGEwEK7_zk0arCvS585VQWtKUqHamP9qWVUehTgG28rCOOGfR6lsQq4aj5cxIVMig1mhdbrAi7RvCYybYRueNqbyL96ReNnEpUbgoEQv-gzFOqiG4FRDxHDO2xM87_uvkLk.webp"
+  }
+];
+
+// Helper function to get selected doctor or default to Dr House (NEVER returns undefined)
+const getSelectedDoctor = (coverImageUrl: string | undefined | null) => {
+  // Safety: Handle null, undefined, or empty strings
+  if (!coverImageUrl || typeof coverImageUrl !== 'string') {
+    console.log('⚠️ Invalid coverImageUrl, defaulting to Dr House:', coverImageUrl);
+    return DOCTOR_ROLES[0]; // Dr House
+  }
+  
+  const doctor = DOCTOR_ROLES.find(role => role.imageUrl === coverImageUrl);
+  if (!doctor) {
+    console.log('⚠️ Doctor not found for URL, defaulting to Dr House:', coverImageUrl);
+    return DOCTOR_ROLES[0]; // Dr House
+  }
+  
+  return doctor;
+};
+
+// Helper function to ensure we always have a valid doctor image URL (NEVER returns undefined)
+const ensureValidDoctorImage = (imageUrl: string | undefined | null) => {
+  // Safety: Handle null, undefined, or empty strings
+  if (!imageUrl || typeof imageUrl !== 'string') {
+    console.log('⚠️ Invalid imageUrl, using Dr House default:', imageUrl);
+    return DOCTOR_ROLES[0].imageUrl; // Dr House URL
+  }
+  
+  // If it's one of our doctor URLs, use it
+  const doctor = DOCTOR_ROLES.find(role => role.imageUrl === imageUrl);
+  if (doctor) {
+    return doctor.imageUrl;
+  }
+  
+  console.log('⚠️ Unknown image URL, defaulting to Dr House:', imageUrl);
+  return DOCTOR_ROLES[0].imageUrl; // Default to Dr House
+};
 
 interface TopicContentBlock {
   type: "text" | "image" | "video" | "quiz";
@@ -44,7 +98,6 @@ interface ValidationErrors {
   title?: string;
   description?: string;
   categories?: string;
-  coverImage?: string;
   languages?: string;
 }
 
@@ -53,21 +106,10 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
-  const [coverImage, setCoverImage] = useState("");
-  
-  // Debug: Log coverImage state changes
-  useEffect(() => {
-    console.log('🔍 DEBUG - coverImage state changed:', {
-      exists: !!coverImage,
-      length: coverImage?.length || 0,
-      type: coverImage?.startsWith('data:') ? 'Base64' : coverImage ? 'URL' : 'Empty',
-      preview: coverImage ? coverImage.substring(0, 30) + '...' : 'NO IMAGE'
-    });
-  }, [coverImage]);
+  const [coverImage, setCoverImage] = useState(DOCTOR_ROLES[0].imageUrl); // Default to Dr House
   const [selectedLangs, setSelectedLangs] = useState<string[]>(["en"]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [topics, setTopics] = useState<Topic[]>([
     { id: 1, title: "Introduction", hook: "", keyLearningPoints: [], script: "", callToAction: "", duration: "", priority: "", content: [] },
   ]);
@@ -88,6 +130,18 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
   const [isLoadingEdit, setIsLoadingEdit] = useState(!!editingDocumentId);
   const isEditing = !!editingDocumentId;
 
+  // Debug: Log coverImage state changes and selected doctor
+  useEffect(() => {
+    const selectedDoctor = getSelectedDoctor(coverImage);
+    console.log('🔍 DEBUG - coverImage state changed:', {
+      exists: !!coverImage,
+      selectedDoctor: selectedDoctor.name,
+      doctorId: selectedDoctor.id,
+      isEditing: isEditing,
+      imageUrl: coverImage
+    });
+  }, [coverImage, isEditing]);
+
   // Load existing training data when editing
   useEffect(() => {
     if (!editingDocumentId) return;
@@ -101,9 +155,26 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
           .single();
 
         if (doc) {
+          console.log('🔍 DEBUG - Loading training document:', {
+            id: doc.id,
+            title: doc.title,
+            cover_image_url: doc.cover_image_url,
+            cover_image_type: typeof doc.cover_image_url,
+            cover_image_length: doc.cover_image_url?.length || 0,
+            all_fields: Object.keys(doc)
+          });
+          
           setTitle(doc.title || "");
           setDescription(doc.description || "");
-          setCoverImage(doc.cover_image_url || "");
+          const coverImageValue = ensureValidDoctorImage(doc.cover_image_url || DOCTOR_ROLES[0].imageUrl);
+          const selectedDoctor = getSelectedDoctor(coverImageValue);
+          console.log('📸 Setting cover image from DB:', {
+            raw_value: doc.cover_image_url,
+            processed_value: coverImageValue,
+            selectedDoctor: selectedDoctor.name,
+            defaulting_to_dr_house: !doc.cover_image_url
+          });
+          setCoverImage(coverImageValue);
           
           // Load categories from document
           if (Array.isArray(doc.categories) && doc.categories.length > 0) {
@@ -259,31 +330,6 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
   };
 
   // Image upload handler
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setValidationErrors(prev => ({ ...prev, coverImage: "File size must be less than 5MB" }));
-      return;
-    }
-
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      setValidationErrors(prev => ({ ...prev, coverImage: "Please select an image file" }));
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        setCoverImage(e.target.result as string);
-        setValidationErrors(prev => ({ ...prev, coverImage: undefined }));
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   const generateDescription = async () => {
     if (!title && !description) {
@@ -431,7 +477,7 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
         description: description || "",
         categories: categories.length > 0 ? categories : [],
         languages: selectedLangs.length > 0 ? selectedLangs : ["en"],
-        coverImageUrl: coverImage || null,
+        coverImageUrl: ensureValidDoctorImage(coverImage),
         assignedToGroups: selectedGroups.length > 0 ? selectedGroups : [],
         status: "Active",
       };
@@ -536,46 +582,97 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
       return;
     }
 
+    // ⭐ BULLETPROOF DOCTOR VALIDATION (FIRST PRIORITY)
+    // Ensure we ALWAYS have a valid doctor selected before proceeding
+    const guaranteedSelectedDoctor = getSelectedDoctor(coverImage);
+    const guaranteedImageUrl = guaranteedSelectedDoctor.imageUrl;
+    
+    // Triple validation that we have a valid doctor image URL
+    if (!guaranteedImageUrl || !guaranteedImageUrl.startsWith('https://')) {
+      console.error('🚨 CRITICAL ERROR: Invalid doctor image URL detected!', {
+        coverImage,
+        guaranteedImageUrl,
+        selectedDoctor: guaranteedSelectedDoctor
+      });
+      // Force set to Dr House as absolute fallback
+      const drHouseUrl = DOCTOR_ROLES[0].imageUrl;
+      setCoverImage(drHouseUrl);
+      toast({ 
+        title: "Using Dr House as presenter", 
+        description: "Default doctor selected for video generation",
+        variant: "default" 
+      });
+      // Continue with Dr House
+    }
+
     // Debug: Check what we have in coverImage state
-    console.log('🔍 DEBUG - coverImage state:', {
+    console.log('🔍 DEBUG - coverImage state at video generation:', {
       exists: !!coverImage,
       type: typeof coverImage,
       length: coverImage?.length || 0,
       startsWithData: coverImage?.startsWith('data:') || false,
-      preview: coverImage ? coverImage.substring(0, 50) + '...' : 'UNDEFINED'
+      preview: coverImage ? coverImage.substring(0, 50) + '...' : 'UNDEFINED',
+      exactValue: coverImage,
+      isEditing: isEditing,
+      editingDocumentId: editingDocumentId
     });
 
-    if (!coverImage || coverImage.trim() === '') {
-      toast({ title: "Please upload a cover image first", description: "Go to Step 1 (Details) and upload an image before generating video", variant: "destructive" });
-      return;
+    // ⭐ FINAL DOCTOR CONFIRMATION (use the guaranteed values from above)
+    const finalSelectedDoctor = getSelectedDoctor(coverImage);
+    const finalImageUrl = finalSelectedDoctor.imageUrl;
+    
+    // Ensure state is synchronized 
+    if (coverImage !== finalSelectedDoctor.imageUrl) {
+      console.log('🔄 Syncing cover image state to selected doctor:', finalSelectedDoctor.name);
+      setCoverImage(finalSelectedDoctor.imageUrl);
     }
+    
+    console.log('🎭 FINAL CONFIRMATION - Doctor for video generation:', {
+      doctorName: finalSelectedDoctor.name,
+      doctorId: finalSelectedDoctor.id,
+      imageUrl: finalImageUrl,
+      imageUrlLength: finalImageUrl.length,
+      imageUrlIsValid: finalImageUrl.startsWith('https://'),
+      willNeverBeUndefined: true
+    });
 
     const blockKey = blockIdx !== undefined ? `${topicId}-${blockIdx}` : `${topicId}-preview`;
     setGeneratingVideoBlockKey(blockKey);
     setVideoGenerationErrors(prev => ({ ...prev, [blockKey]: '' }));
 
     try {
-      console.log('🎬 Generating video with:', {
-        script: topic.script ? topic.script.substring(0, 50) + '...' : 'NO SCRIPT',
-        imageType: coverImage ? (coverImage.startsWith('data:') ? 'User Upload (Base64)' : 'URL') : 'NO IMAGE',
-        imagePreview: coverImage ? coverImage.substring(0, 50) + '...' : 'NO IMAGE'
-      });
+      // ⭐ GUARANTEED: Always use the final validated doctor image URL for video generation
+      const imageUrl = finalImageUrl;
 
-      // Prepare request body with validation
+      // ⚠️ FINAL SAFETY VALIDATION before sending request
+      if (!imageUrl || !imageUrl.startsWith('https://')) {
+        throw new Error(`🚨 CRITICAL: Invalid doctor image URL detected: "${imageUrl}". This should never happen with proper validation!`);
+      }
+
+      console.log('🎬 SENDING VIDEO REQUEST with guaranteed doctor image:', {
+        script: topic.script ? topic.script.substring(0, 50) + '...' : 'NO SCRIPT',
+        selectedDoctor: finalSelectedDoctor.name,
+        doctorImageUrl: imageUrl,
+        imageUrlIsValid: imageUrl.startsWith('https://'),
+        imageUrlLength: imageUrl.length
+      });
+      
       const requestBody = {
         script: topic.script || '',
-        imageUrl: coverImage || '',
+        imageUrl: imageUrl, // GUARANTEED to be a valid doctor image URL
         resolution: '720p'
       };
       
-      // Debug: Log exactly what we're sending
-      console.log('🔍 DEBUG - Request body being sent:', {
+      // Final validation of request body
+      console.log('🔍 FINAL REQUEST BODY for video generation:', {
         script: requestBody.script ? `${requestBody.script.length} characters` : 'EMPTY',
-        imageUrl: requestBody.imageUrl ? `${requestBody.imageUrl.length} characters` : 'EMPTY',
+        imageUrl: `${requestBody.imageUrl.length} characters - GUARANTEED VALID DOCTOR URL`,
+        selectedDoctorName: finalSelectedDoctor.name,
+        doctorId: finalSelectedDoctor.id,
         resolution: requestBody.resolution
       });
 
-      const response = await fetch('http://localhost:3004/generate-video', {
+      const response = await fetch('http://localhost:3002/generate-video', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -744,42 +841,40 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
               </p>
             </div>
 
-            {/* Cover Image Upload */}
+            {/* Role Selection */}
             <div>
-              <label className="block text-sm font-semibold mb-2 text-foreground">Cover Image</label>
-              <div className="space-y-3">
-                {coverImage ? (
-                  <div className="relative">
-                    <img src={coverImage} alt="Cover" className="w-full max-h-64 object-contain rounded-xl border border-border bg-muted/20" />
-                    <button
-                      onClick={() => setCoverImage("")}
-                      className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 rounded-lg text-white transition-colors"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ) : (
+              <label className="block text-sm font-semibold mb-3 text-foreground">
+                Choose Training Presenter <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-3 gap-4">
+                {DOCTOR_ROLES.map((role) => (
                   <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-48 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-3 hover:border-primary/50 hover:bg-accent/50 transition-colors"
+                    key={role.id}
+                    type="button"
+                    onClick={() => setCoverImage(role.imageUrl)}
+                    className={`relative group rounded-xl overflow-hidden border-2 transition-all hover:shadow-lg ${
+                      coverImage === role.imageUrl 
+                        ? "border-primary shadow-lg ring-2 ring-primary/20" 
+                        : "border-border hover:border-primary/50"
+                    }`}
                   >
-                    <Upload size={32} className="text-muted-foreground" />
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-foreground">Upload cover image</p>
-                      <p className="text-xs text-muted-foreground">PNG, JPG up to 5MB</p>
+                    <img 
+                      src={role.imageUrl} 
+                      alt={role.name}
+                      className="w-full h-48 object-cover"
+                    />
+                    <div className={`absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3 ${
+                      coverImage === role.imageUrl ? "from-primary/80" : ""
+                    }`}>
+                      <p className="text-white font-medium text-sm">{role.name}</p>
                     </div>
+                    {coverImage === role.imageUrl && (
+                      <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    )}
                   </button>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                {validationErrors.coverImage && (
-                  <p className="text-red-500 text-sm">{validationErrors.coverImage}</p>
-                )}
+                ))}
               </div>
             </div>
 
@@ -973,29 +1068,22 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
         {/* Step 2: Content */}
         {step === 2 && (
           <div className="space-y-6 animate-fade-in">
-            {/* Debug Panel - Remove this after testing */}
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 text-sm">
-              <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">🐛 Debug Info (Remove after testing)</h4>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+            {/* Selected Doctor Info */}
+            <div className="bg-accent/30 border border-primary/20 rounded-xl p-4 text-sm">
+              <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                🎭 Selected Training Presenter
+              </h4>
+              <div className="flex items-center gap-3">
+                <img 
+                  src={coverImage} 
+                  alt="Selected doctor" 
+                  className="w-12 h-12 object-cover rounded-lg border border-border" 
+                />
                 <div>
-                  <strong>Cover Image:</strong> {coverImage ? '✅ Set' : '❌ Missing'}
-                </div>
-                <div>
-                  <strong>Image Length:</strong> {coverImage?.length || 0}
-                </div>
-                <div>
-                  <strong>Image Type:</strong> {coverImage?.startsWith('data:') ? 'Base64' : coverImage ? 'URL' : 'None'}
-                </div>
-                <div>
-                  <strong>Current Step:</strong> {step}
+                  <p className="font-medium text-foreground">{getSelectedDoctor(coverImage).name}</p>
+                  <p className="text-xs text-muted-foreground">Will appear in generated videos</p>
                 </div>
               </div>
-              {coverImage && (
-                <div className="mt-2">
-                  <strong>Image Preview:</strong>
-                  <img src={coverImage} alt="Debug" className="w-16 h-16 object-cover rounded mt-1" />
-                </div>
-              )}
             </div>
             {/* AI generate structure banner */}
             <div className="bg-accent border border-primary/20 rounded-2xl p-5 flex items-center justify-between gap-4">
@@ -1402,7 +1490,7 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
                                   placeholder="Paste image URL or generate with AI below..."
                                   className="w-full p-3 rounded-xl border border-border bg-card outline-none text-foreground text-sm"
                                 />
-                                {block.value && (block.value.startsWith("data:") || block.value.startsWith("http")) && (
+                                {block.value && (block.value?.startsWith("data:") || block.value?.startsWith("http")) && (
                                   <img src={block.value} alt="Preview" className="rounded-xl border border-border max-h-64 object-contain" />
                                 )}
                                 <div className="flex gap-2 items-end">
@@ -1632,7 +1720,7 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
                                   onClick={() => generateVideo(topic.id)}
                                   disabled={isGeneratingVideo || !coverImage}
                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
-                                  title={!coverImage ? 'Upload an image in Step 1 first' : 'Generate video with your uploaded image'}
+                                  title={!coverImage ? 'Select a doctor in Step 1 first' : `Generate video with ${getSelectedDoctor(coverImage).name}`}
                                 >
                                   <Sparkles size={12} />
                                   Generate Video
@@ -1700,7 +1788,7 @@ export function CreateTrainingFlow({ staff, onBack, onPublish, editingDocumentId
                                       Generate Video
                                     </button>
                                     {!coverImage && (
-                                      <p className="text-xs text-red-500">Upload an image in Step 1 first</p>
+                                      <p className="text-xs text-red-500">Select a doctor in Step 1 first</p>
                                     )}
                                     <p className="text-xs text-muted-foreground">
                                       Image: {coverImage ? '✅ Ready' : '❌ Missing'}
